@@ -1,0 +1,30 @@
+{
+  "name": "agentlayer-sdk",
+  "version": "1.2.0",
+  "description": "SDK officiel pour AgentLayer — la couche financière pour agents IA",
+  "main": "index.js",
+  "type": "commonjs",
+  "keywords": [
+    "ai-agents",
+    "payments",
+    "x402",
+    "did",
+    "blockchain"
+  ],
+  "author": "AgentLayer",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ptrs82/agentlayer-sdk.git"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "index.js",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}
