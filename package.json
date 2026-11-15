@@ -1,6 +1,6 @@
 {
   "name": "agentlayer-sdk",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "SDK officiel pour AgentLayer — wallets avec plafonds, cartes à usage unique et identité vérifiable pour agents IA",
   "main": "index.js",
   "type": "commonjs",

@@ -65,6 +65,31 @@ class AgentLayerClient {
     });
   }
 
+  /**
+   * Au-dessus de ce montant (EUR), chaque achat de l'agent attend votre validation (null ou 0 = jamais).
+   */
+  async setApprovalThreshold(agentId, threshold) {
+    return request(`/client/wallets/${encodeURIComponent(agentId)}/approval`, {
+      method: 'POST',
+      headers: this._headers(),
+      body: JSON.stringify({ threshold: threshold || null })
+    });
+  }
+
+  /** Demandes de validation (les plus récentes d'abord). */
+  async listApprovals() {
+    return request('/client/approvals', { headers: this._headers() });
+  }
+
+  /** Accepte ou refuse une demande de validation. */
+  async decideApproval(approvalId, approve) {
+    return request(`/client/approvals/${encodeURIComponent(approvalId)}/decide`, {
+      method: 'POST',
+      headers: this._headers(),
+      body: JSON.stringify({ decision: approve ? 'approve' : 'reject' })
+    });
+  }
+
   /** Bloque immédiatement un agent : il ne peut plus payer ni obtenir de carte. */
   async blockAgent(agentId) {
     return request(`/client/wallets/${encodeURIComponent(agentId)}/block`, { method: 'POST', headers: this._headers() });
@@ -112,11 +137,11 @@ class AgentLayerAgent {
     return { 'x-agent-token': this.token };
   }
 
-  async pay(amount, description) {
+  async pay(amount, description, options = {}) {
     return request('/agent/pay', {
       method: 'POST',
       headers: this._headers(),
-      body: JSON.stringify({ amount, description })
+      body: JSON.stringify({ amount, description, approval_id: options.approvalId })
     });
   }
 
@@ -127,13 +152,16 @@ class AgentLayerAgent {
    * @param {number} amount montant total exact (EUR)
    * @param {string} merchant ex. 'Air France'
    * @param {string} [description] ex. 'Vol Paris-Nice du 12 décembre'
-   * @returns {Promise<{success: boolean, card: object, transaction: object, instructions: string}>}
+   * @param {object} [options]
+   * @param {string} [options.approvalId] identifiant reçu quand l'achat a dû être validé par le propriétaire
+   * @returns {Promise<object>} { success, card, transaction, instructions }
+   *   ou, si l'achat dépasse le seuil de validation : { status: 'pending_approval', approval_id, message }
    */
-  async getCard(amount, merchant, description) {
+  async getCard(amount, merchant, description, options = {}) {
     return request('/agent/card', {
       method: 'POST',
       headers: this._headers(),
-      body: JSON.stringify({ amount, merchant, description })
+      body: JSON.stringify({ amount, merchant, description, approval_id: options.approvalId })
     });
   }
 

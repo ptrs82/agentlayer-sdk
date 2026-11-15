@@ -21,6 +21,9 @@ const wallet = await client.createWallet('Agent voyages', 150, 500, { allowedMer
 // Modifier plus tard les commerçants autorisés (tableau vide = tous)
 await client.setAllowedMerchants(wallet.wallet.agent_id, ['travel', 'restaurants']);
 
+// Au-dessus de 300 €, chaque achat attend votre accord (email avec Accepter / Refuser)
+await client.setApprovalThreshold(wallet.wallet.agent_id, 300);
+
 // Bloquer l'agent en urgence
 await client.blockAgent(wallet.wallet.agent_id);
 
@@ -41,6 +44,13 @@ const agent = new AgentLayerAgent('agt_live_xxxxx');
 // Payer un vrai commerçant : carte à usage unique, plafonnée au montant exact
 const { card } = await agent.getCard(120, 'Air France', 'Vol Paris-Nice du 12 décembre');
 // card.number, card.exp_month, card.exp_year, card.cvc, card.cardholder_name, card.billing_address
+
+// Au-dessus du seuil de validation, l'achat attend l'accord du propriétaire
+const r = await agent.getCard(412, 'Hôtel Negresco', '2 nuits');
+if (r.status === 'pending_approval') {
+  // ... plus tard, une fois l'achat accepté, même demande avec l'identifiant de validation :
+  const { card } = await agent.getCard(412, 'Hôtel Negresco', '2 nuits', { approvalId: r.approval_id });
+}
 
 // Paiement interne (débit du wallet)
 await agent.pay(5, 'Appel API');
