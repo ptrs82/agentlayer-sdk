@@ -1,6 +1,6 @@
 # AgentLayer SDK
 
-SDK officiel Node.js pour [AgentLayer](https://agentlayer.alwaysdata.net) — la couche financière pour agents IA (wallets, paiements, identité vérifiable on-chain).
+SDK officiel Node.js pour [AgentLayer](https://agentlayer.alwaysdata.net) — la couche financière pour agents IA : wallets avec plafonds, cartes virtuelles à usage unique, identité vérifiable on-chain.
 
 ## Installation
 
@@ -15,8 +15,14 @@ const { AgentLayerClient } = require('agentlayer-sdk');
 
 const client = await AgentLayerClient.login('vous@exemple.com', 'votre_mot_de_passe');
 
-// Créer un wallet pour un agent
-const wallet = await client.createWallet('Mon Agent', 50, 500);
+// Créer un agent : 150 € max par achat, 500 € par jour, cartes limitées aux voyages
+const wallet = await client.createWallet('Agent voyages', 150, 500, { allowedMerchants: ['travel'] });
+
+// Modifier plus tard les commerçants autorisés (tableau vide = tous)
+await client.setAllowedMerchants(wallet.wallet.agent_id, ['travel', 'restaurants']);
+
+// Bloquer l'agent en urgence
+await client.blockAgent(wallet.wallet.agent_id);
 
 // Payer depuis le dashboard
 await client.pay(wallet.wallet.agent_id, 10, 'Achat API');
@@ -32,7 +38,11 @@ const { AgentLayerAgent } = require('agentlayer-sdk');
 
 const agent = new AgentLayerAgent('agt_live_xxxxx');
 
-// L'agent paie directement
+// Payer un vrai commerçant : carte à usage unique, plafonnée au montant exact
+const { card } = await agent.getCard(120, 'Air France', 'Vol Paris-Nice du 12 décembre');
+// card.number, card.exp_month, card.exp_year, card.cvc, card.cardholder_name, card.billing_address
+
+// Paiement interne (débit du wallet)
 await agent.pay(5, 'Appel API');
 
 // Vérifier son solde
@@ -41,6 +51,21 @@ const balance = await agent.balance();
 // Vérifier son identité (KYA)
 const identity = await agent.identity();
 ```
+
+## Erreurs
+
+Les refus sont renvoyés sous forme d'exception avec `status` et `code` :
+
+```javascript
+try {
+  await agent.getCard(900, 'Hôtel Negresco');
+} catch (err) {
+  if (err.status === 403) console.log('Refusé par les règles :', err.message);   // plafond, solde, agent bloqué
+  if (err.code === 'license_required') console.log('Essai terminé : une licence est nécessaire');
+}
+```
+
+Les cartes sont aujourd'hui émises en mode test (Stripe Issuing).
 
 ## Vérification publique d'identité (sans authentification)
 

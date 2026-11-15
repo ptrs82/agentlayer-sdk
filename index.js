@@ -5,8 +5,13 @@ async function request(path, options = {}) {
     ...options,
     headers: { 'Content-Type': 'application/json', ...options.headers }
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || `Erreur AgentLayer (${res.status})`);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(data.error || `Erreur AgentLayer (${res.status})`);
+    err.status = res.status;          // 402 = licence nécessaire, 403 = refusé par les règles, 401 = token invalide
+    err.code = data.code || null;     // ex. 'license_required'
+    throw err;
+  }
   return data;
 }
 
@@ -31,12 +36,42 @@ class AgentLayerClient {
     return { Authorization: `Bearer ${this.token}` };
   }
 
-  async createWallet(agentName, maxPerTransaction, maxDaily) {
+  /**
+   * Crée un agent avec son wallet.
+   * @param {string} agentName
+   * @param {number} maxPerTransaction plafond par achat (EUR)
+   * @param {number} maxDaily plafond par jour (EUR)
+   * @param {object} [options]
+   * @param {string[]} [options.allowedMerchants] types de commerçants autorisés pour ses cartes :
+   *   'travel', 'restaurants', 'software', 'advertising', 'office', 'groceries', 'fuel' (vide = tous)
+   */
+  async createWallet(agentName, maxPerTransaction, maxDaily, options = {}) {
     return request('/client/wallets/create', {
       method: 'POST',
       headers: this._headers(),
-      body: JSON.stringify({ agent_name: agentName, max_per_transaction: maxPerTransaction, max_daily: maxDaily })
+      body: JSON.stringify({
+        agent_name: agentName, max_per_transaction: maxPerTransaction, max_daily: maxDaily,
+        allowed_categories: options.allowedMerchants || []
+      })
     });
+  }
+
+  /** Limite les cartes d'un agent à certains types de commerçants (tableau vide = tous). */
+  async setAllowedMerchants(agentId, groups) {
+    return request(`/client/wallets/${encodeURIComponent(agentId)}/categories`, {
+      method: 'POST',
+      headers: this._headers(),
+      body: JSON.stringify({ groups: groups || [] })
+    });
+  }
+
+  /** Bloque immédiatement un agent : il ne peut plus payer ni obtenir de carte. */
+  async blockAgent(agentId) {
+    return request(`/client/wallets/${encodeURIComponent(agentId)}/block`, { method: 'POST', headers: this._headers() });
+  }
+
+  async unblockAgent(agentId) {
+    return request(`/client/wallets/${encodeURIComponent(agentId)}/unblock`, { method: 'POST', headers: this._headers() });
   }
 
   async listWallets() {
@@ -82,6 +117,23 @@ class AgentLayerAgent {
       method: 'POST',
       headers: this._headers(),
       body: JSON.stringify({ amount, description })
+    });
+  }
+
+  /**
+   * Demande une carte virtuelle à usage unique pour UN achat chez UN commerçant.
+   * AgentLayer vérifie d'abord les règles de l'agent, puis renvoie une carte plafonnée au montant exact,
+   * annulée après le paiement (ou au bout de 30 minutes si elle ne sert pas).
+   * @param {number} amount montant total exact (EUR)
+   * @param {string} merchant ex. 'Air France'
+   * @param {string} [description] ex. 'Vol Paris-Nice du 12 décembre'
+   * @returns {Promise<{success: boolean, card: object, transaction: object, instructions: string}>}
+   */
+  async getCard(amount, merchant, description) {
+    return request('/agent/card', {
+      method: 'POST',
+      headers: this._headers(),
+      body: JSON.stringify({ amount, merchant, description })
     });
   }
 
